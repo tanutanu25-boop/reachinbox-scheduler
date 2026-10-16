@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # MySQL Database Service
+  # Stores email records, scheduling status, delivery attempts & preview URLs
+  # =========================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: reachinbox-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: reachinbox
+      MYSQL_DATABASE: reachinbox_scheduler
+    ports:
+      - "3306:3306"
+    volumes:
+      # Named persistent volume ensures data survives container stops & restarts
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-preachinbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # =========================================================================
+  # Redis Queue Broker Service
+  # Stores BullMQ delayed jobs with persistence enabled (AOF + RDB snapshots)
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: reachinbox-redis
+    restart: always
+    # Enable Append-Only File (AOF) persistence so queued jobs survive restarts
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--save", "60", "1"]
+    ports:
+      - "6379:6379"
+    volumes:
+      # Named persistent volume for Redis AOF/RDB files
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
